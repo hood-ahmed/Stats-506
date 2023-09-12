@@ -253,6 +253,7 @@ simulate_poker_round <- function(num_players) {
 
 ```{r}
 simulate_poker_round(4)  # Simulate a round of poker with 4 players
+simulate_poker_round(6)  # Simulate a round of poker with 6 players
 
 
 ```
@@ -262,15 +263,15 @@ simulate_poker_round(4)  # Simulate a round of poker with 4 players
 ```{r}
  
 determine_poker_hand <- function(suits, ranks) {
-  # Sort ranks in descending order and count unique ranks
+  # the "sort" function is used to rank in descending order and count unique ranks
   sort_ranks <- sort(table(ranks), decreasing = TRUE)
   
   # creates a series of conditional if statements to evaluate the different potential hands. 
   if (length(unique(suits)) == 1 && all(diff(sort(ranks)) == 1)) { # the unique function is used to eliminate or delete the duplicate values.
-    return("Straight Flush")
-  } else if (any(sort_ranks == 4)) { 
+    return("Straight Flush") 
+  } else if (any(sort_ranks == 4)) { # the "any" function reports whether any or all of their arguments are TRUE.
     return("Four of a Kind")
-  } else if (any(sort_ranks == 3) && any(sort_ranks == 2)) {
+  } else if (any(sort_ranks == 3) && any(sort_ranks == 2)) { # we use a logical operator to group together tbe outcomes for 3 and 4 and produce a length-one logical vector
     return("Full House")
   } else if (length(unique(suits)) == 1) {
     return("Flush")
@@ -294,8 +295,7 @@ deal_poker_round <- function(num_players) {
   ranks <- c(2:10, "Jack", "Queen", "King", "Ace")
   
   # Create a deck of cards
-  # the expand.grid function is used to create a data frame from all combinations of the supplied vectors.
-  deck <- expand.grid(Suit = suits, Rank = ranks, stringsAsFactors = FALSE)
+  deck <- expand.grid(Suit = suits, Rank = ranks, stringsAsFactors = FALSE)   # the expand.grid function is used to create a data frame from all combinations of the supplied vectors.
   
   # Shuffle the deck by random sampling from the created vector.
   shuffled_deck <- deck[sample(nrow(deck)), ]
