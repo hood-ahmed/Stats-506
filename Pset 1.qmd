@@ -1,0 +1,314 @@
+---
+title: "Pset 1"
+format:
+  html:
+    embed-resources: true
+editor: visual
+---
+
+## Problem 1
+
+## A
+
+I begin by reading the data.
+
+```{r}
+data <- read.csv("wine.data")
+
+```
+
+## B
+
+I assign the names from the names file to the columns of the data.
+
+```{r}
+colnames(data)[1] = "Class"
+colnames(data)[2] = "Alcohol"
+colnames(data)[3] = "Malic acid"
+colnames(data)[4] = "Ash"
+colnames(data)[5] = "Alcalinity of ash"
+colnames(data)[6] = "Magnesium"
+colnames(data)[7] = "Total phenols"
+colnames(data)[8] = "Flavanoids"
+colnames(data)[9] = "Nonflavanoid phenols"
+colnames(data)[10] = "Proanthocyanins"
+colnames(data)[11] = "Color intensity"
+colnames(data)[12] = "Hue"
+colnames(data)[13] = "OD280/OD315 of diluted wines"
+colnames(data)[14] = "Proline"
+```
+
+## C
+
+### Part 1. wine with the highest alcohol content
+
+```{r}
+which.max(data$Alcohol)
+```
+
+Row 8 has the highest alcohol content.
+
+I subset row 8 from the vector "class"
+
+```{r}
+data$Class[8]
+```
+
+Class 1 has the highest alcohol content.
+
+### Part 2. wine with the lowest alcohol content
+
+```{r}
+which.min(data$Alcohol)
+data$Class[8]
+```
+
+Class 2 has the lowest content.
+
+### Part 3. wine with higher levels of magnesium than 114
+
+```{r}
+subset_magnesium <- data$Magnesium[data$Magnesium>114]
+
+length(subset_magnesium)
+```
+
+There are 25 wines with higher levels.
+
+### Part 4. wine with higher levels of magnesium than 114 by class
+
+```{r}
+subset_class <- data$Class[subset_magnesium]
+
+print(subset_class)
+
+```
+
+Classes 2 and 3 are the ones with the highler level of magnesium over 114.
+
+## D
+
+Average value of each variable
+
+```{r}
+overall.averages <- colMeans(data)
+```
+
+Average value of each variable by class
+
+```{r}
+summarized_data <- aggregate(. ~ Class, data = data, FUN = mean)
+```
+
+## E
+
+I create a the function to get p-values
+
+```{r}
+perform_t_test <- function(x) {
+  t_test_result <- t.test(x, data$Ash)
+  return(t_test_result$p.value)
+}
+```
+
+Apply the function to each column and get p-values
+
+```{r}
+p_values <- apply(data, 2, perform_t_test)
+print(p_values)
+```
+
+## Problem 2
+
+## Part A
+
+```{r}
+isPerfectPower <- function(x, power) {
+  maxBase <- round(sqrt(x)) # to round up number after taking square root.
+  
+  for (base in 2:maxBase) {
+    result <- base^power
+    if (result == x) {
+      return(TRUE)
+    } else if (result > x) {
+  return(FALSE)
+    }
+  }
+  if (isPerfectPower(x, power)) {
+    cat(paste(x, "is a perfect power of", power))
+  } else {
+    cat(paste(x, "is not a perfect power of", power))
+  }
+}
+```
+
+## Part B
+
+```{r}
+isPerfectPower <- function(number, exponent) {
+  if (number <= 1 || exponent <= 1) {
+    return(FALSE)  # Perfect powers must be greater than 1.
+  }
+  
+  root <- round(number^(1/exponent))
+  result <- root^exponent
+  
+  return(result == number)
+}
+
+findRootPower <- function(number) {
+  for (exponent in 2:floor(log2(number))) {
+    if (isPerfectPower(number, exponent)) {
+      return(list(root = round(number^(1/exponent)), power = exponent))
+    }
+  }
+  
+  return("Not a perfect power.")
+}
+
+result1 <- findRootPower(27)
+print(result1)
+
+result2 <- findRootPower(13060694016)
+print(result2)  
+
+result3 <- findRootPower(7776)
+print(result3)  
+
+result4 <- findRootPower(170859375)
+print(result4)  
+
+result5 <- findRootPower(58247422)
+print(result5)  
+
+result6 <- findRootPower(94143178827)
+print(result6)  
+
+```
+
+## Problem 3
+
+## A
+
+```{r}
+determine_poker_hand <- function(suits, ranks) {
+  rank_counts <- table(ranks)
+  
+  is_flush <- length(unique(suits)) == 1
+  
+  is_straight <- all(diff(sort(unique(ranks))) == 1)
+  
+  is_royal_flush <- is_flush && all(sort(unique(ranks)) == c(10, 11, 12, 13, 14))
+  
+  if (is_royal_flush) {
+    return("Royal Flush")
+  } else if (is_flush && is_straight) {
+    return("Straight Flush")
+  } else if (max(rank_counts) == 4) {
+    return("Four of a Kind")
+  } else if (max(rank_counts) == 3 && sum(rank_counts == 2) == 1) {
+    return("Full House")
+  } else if (is_flush) {
+    return("Flush")
+  } else if (is_straight) {
+    return("Straight")
+  } else if (max(rank_counts) == 3) {
+    return("Three of a Kind")
+  } else if (sum(rank_counts == 2) == 2) {
+    return("Two Pair")
+  } else if (max(rank_counts) == 2) {
+    return("One Pair")
+  } else {
+    return("High Card")
+  }
+}
+
+simulate_poker_round <- function(num_players) {
+  suits <- c("Hearts", "Diamonds", "Clubs", "Spades")
+  ranks <- c(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14)
+  
+  deck <- expand.grid(Rank = ranks, Suit = suits)
+  
+  shuffled_deck <- deck[sample(nrow(deck)), ]
+  
+  player_hands <- vector("list", length = num_players)
+  for (i in 1:num_players) {
+    player_hands[[i]] <- shuffled_deck[((i - 1) * 5 + 1):(i * 5), ]
+  }
+  
+  for (i in 1:num_players) {
+    cat("Player", i, "hand:\n")
+    player_hand <- player_hands[[i]]
+    hand_suits <- player_hand$Suit
+    hand_ranks <- player_hand$Rank
+    hand_name <- determine_poker_hand(hand_suits, hand_ranks)
+    cat("Cards:", paste(hand_ranks, hand_suits, sep = " "), "\n")
+    cat("Hand:", hand_name, "\n\n")
+  }
+}
+
+```
+
+## B
+
+```{r}
+simulate_poker_round(4)  # Simulate a round of poker with 4 players
+
+
+```
+
+## C
+
+```{r}
+ 
+determine_poker_hand <- function(suits, ranks) {
+  # Sort ranks in descending order and count unique ranks
+  sort_ranks <- sort(table(ranks), decreasing = TRUE)
+  
+  # creates a series of conditional if statements to evaluate the different potential hands. 
+  if (length(unique(suits)) == 1 && all(diff(sort(ranks)) == 1)) { # the unique function is used to eliminate or delete the duplicate values.
+    return("Straight Flush")
+  } else if (any(sort_ranks == 4)) { 
+    return("Four of a Kind")
+  } else if (any(sort_ranks == 3) && any(sort_ranks == 2)) {
+    return("Full House")
+  } else if (length(unique(suits)) == 1) {
+    return("Flush")
+  } else if (any(sort_ranks == 3)) {
+    return("Three of a Kind")
+  } else if (all(diff(sort(ranks)) == 1)) {
+    return("Straight")
+  } else if (sum(sort_ranks == 2) == 4) {
+    return("Two Pair")
+  } else if (sum(sort_ranks == 2) == 2) {
+    return("One Pair")
+  } else {
+    return("High Card")
+  }
+}
+
+# Creates a function to simulate dealing a round of 5-card stud poker
+deal_poker_round <- function(num_players) {
+  # Define the suits and ranks
+  suits <- c("Hearts", "Diamonds", "Clubs", "Spades")
+  ranks <- c(2:10, "Jack", "Queen", "King", "Ace")
+  
+  # Create a deck of cards
+  # the expand.grid function is used to create a data frame from all combinations of the supplied vectors.
+  deck <- expand.grid(Suit = suits, Rank = ranks, stringsAsFactors = FALSE)
+  
+  # Shuffle the deck by random sampling from the created vector.
+  shuffled_deck <- deck[sample(nrow(deck)), ]
+  
+  # Deal 5 cards to each player by creating a loop that iterates over the deck created to each created player.
+  players <- vector("list", num_players)
+  for (i in 1:num_players) {
+    players[[i]] <- shuffled_deck[((i - 1) * 5 + 1):(i * 5), ]
+    cat("Player", i, "Hand:", "\n")
+    print(players[[i]])
+    hand_name <- determine_poker_hand(players[[i]]$Suit, players[[i]]$Rank)
+    cat("Hand Name:", hand_name, "\n\n")
+  }
+}
+
+```
