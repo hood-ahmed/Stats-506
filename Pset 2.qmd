@@ -1,0 +1,303 @@
+---
+title: "Problem Set 2"
+author: "Hood Ahmed"
+format:
+  html:
+    embed-resources: true
+editor: visual
+---
+
+Link to GitHub repository: https://github.com/hood-ahmed/Stats-506
+
+## Problem 1
+
+## A: Functions
+
+Version 1: Loop
+
+```{r}
+#' function involving loop 
+#' @param n input is the number of dice to roll
+#' @return total winnings or loses 
+
+funct1 <- function(n) { 
+  winnings <- n*-2 # subtract 2 for each roll
+  
+  for (i in 1:n) {
+    roll <- sample(1:6, 1)  # Draw 1 number from a roll of a 6-sided die
+    
+    if (roll %in% c(2, 4, 6)) { #introduce conditional for even number
+      winnings <- winnings + roll # 
+    }
+  }
+  return(winnings)
+}
+```
+
+Version 2: Vectorized
+
+```{r}
+
+#' function involving vectorization
+#' Like last time, I start with the same function. 
+#' However, I eliminate the loop to make it more efficient
+#' I use %% to divide rolls by 2 and see if it returns a remainder of 0, then it is even.
+#' I use "replace = true" to allow for drawing the same number.
+#' @param num_rolls input is the number of dice to roll
+#' @return total winnings or loses 
+
+funct2 <- function(n) {
+  rolls <- sample(1:6, n, replace = TRUE)
+  winnings <- rolls[rolls %% 2 == 0]
+  return(sum(winnings) - 2 * n)
+}
+
+```
+
+Version 3: Table
+
+```{r}
+funct3 <- function(n) {
+  rolls <- sample(1:6, n, replace = TRUE)
+  tab <- table(rolls)
+  winnings <- sum(as.numeric(names(tab)) * as.integer(tab) * (as.numeric(names(tab)) %% 2 == 0))
+  total_cost <- 2 * n
+  net_winnings = winnings - total_cost
+  return(net_winnings)
+}
+```
+
+Version 4: Apply
+
+```{r}
+#' function involving "apply" function
+#' I create to the first row of the matrix.
+#' @param num_rolls input is the number of dice to roll
+#' @return total winnings or loses 
+
+funct4 <- function(n) {
+  rolls <- sample(1:6, n, replace = TRUE)
+  results <- sapply(rolls, function(x) if(x %% 2 == 0) return(x) else return(0))
+  return(sum(results) - 2 * n)
+}
+
+```
+
+## B: Demonstration
+
+*Demonstrate that all versions work. Do so by running each a few times, once with an input a 3, and once with an input of 3000.*
+
+```{r}
+
+cat("Version 1 results with input 3:", funct1(3), "\n")
+cat("Version 2 results with input 3:", funct2(3), "\n")
+cat("Version 3 results with input 3:", funct3(3), "\n")
+cat("Version 4 results with input 3:", funct4(3), "\n")
+
+cat("Version 1 results with input 3000:", funct1(3000), "\n")
+cat("Version 2 results with input 3000:", funct2(3000), "\n")
+cat("Version 3 results with input 3000:", funct3(3000), "\n")
+cat("Version 4 results with input 3000:", funct4(3000), "\n\n")
+```
+
+## C: Demonstration
+
+```{r}
+
+set.seed(10)
+cat("Version 1 results with input 3:", funct1(3), "\n")
+set.seed(10)
+cat("Version 2 results with input 3:", funct2(3), "\n")
+set.seed(10)
+cat("Version 3 results with input 3:", funct3(3), "\n")
+set.seed(10)
+cat("Version 4 results with input 3:", funct4(3), "\n")
+
+set.seed(10)
+cat("Version 1 results with input 3000:", funct1(3000), "\n")
+set.seed(10)
+cat("Version 2 results with input 3000:", funct2(3000), "\n")
+set.seed(10)
+cat("Version 3 results with input 3000:", funct3(3000), "\n")
+set.seed(10)
+cat("Version 4 results with input 3000:", funct4(3000), "\n\n")
+```
+
+## D: Microbenchmark
+
+```{r}
+
+library(microbenchmark)
+# Benchmark for input = 100
+set.seed(10)
+micro_100 <- microbenchmark(
+  f1 = funct1(100),
+  f2 = funct2(100),
+  f3 = funct3(100),
+  f4 = funct4(100),
+  times = 100
+)
+
+# Benchmark for input = 10000
+set.seed(10)
+micro_10000 <- microbenchmark(
+  v1 = funct1(10000),
+  v2 = funct2(10000),
+  v3 = funct3(10000),
+  v4 = funct4(10000),
+  times = 100
+)
+print(cbind(micro_100, micro_10000))
+
+```
+
+## Problem 2
+
+## A: Renaming variables
+
+```{r}
+cars.original <- read.csv('cars.csv')
+
+cars <- colnames(cars.original) <- c("height", "length", "width", "Driveline", "Engine.Type", "hybrid", "gears", "transmission", "city.mpg", "type", "highway.mpg", "classification", "ID", "make", "model.year", "year", "horsepower", "torque")
+
+```
+
+## B: Restricting the data
+
+*Restrict the data to cars whose Fuel Type is "Gasoline".*
+
+```{r}
+data <- cars.original[cars.original$type == "Gasoline", ]
+
+```
+
+## C: Regression
+
+*Fit a linear regression model predicting MPG on the highway.*
+
+I use "as.factor" to treat year as a categorical variable.
+
+```{r}
+
+mod1 <- lm(highway.mpg ~ horsepower + torque + height + length + width + as.factor(year), data = data)
+
+library(stargazer)
+
+stargazer(mod1, type = "text", title = "Linear regression model")
+```
+
+I use the stargazer package to produce more readable output.
+
+*Interpretation of the relationship between horsepower and MPG:*
+
+Holding torque, height, length, width and year constant, a one-unit change in horsepower is estimated to increase highway mpg by 0.017. The effect is statistically significant effect at the 0.001 level.
+
+## D: Interaction
+
+*Refit the model (with lm) and generate an interaction plot*
+
+I multiply both variables within the regression model for the interaction:
+
+```{r}
+mod2 <- lm(highway.mpg ~ horsepower + torque + horsepower*torque + height + length + width + as.factor(year), data = data)
+
+stargazer(mod2, type = "text", title = "Linear regression model")
+```
+
+I use the interactions package to generate the plot
+
+``` r
+summary(data$torque)
+summary(data$horsepower)
+
+library(interactions)
+interact_plot(mod2, pred = horsepower, modx = torque, interval = TRUE, at = list(year = 2012))
+```
+
+## E: Calculating Beta
+
+The formula for the beta coefficient is:
+
+$$
+\beta = (X^T X)^{-1} X^T Y 
+$$
+
+I start by creating a matrix out of the predictors and extracting the outcome variable. I then apply this formula and
+
+```{r}
+X <- model.matrix(~ horsepower + torque + horsepower*torque + height + length + width + as.factor(year), data=data)
+y <- data$highway.mpg
+beta_manual <- solve(t(X) %*% X) %*% t(X) %*% y
+beta_lm <- coef(mod2)
+print(beta_manual)
+print(beta_lm)
+
+```
+
+## Problem 3
+
+## A: Renaming variables
+
+``` stata
+
+import delimited "C:\Users\hoods\OneDrive\Desktop\Stats 506\Psets\Pset 2\cars.csv"
+
+
+rename dimensionsheight height
+
+rename dimensionslength length
+
+rename dimensionswidth width
+
+rename engineinformationenginetype enginetype
+
+rename engineinformationhybrid hybrid
+
+rename engineinformationnumberofforward gears
+
+rename engineinformationtransmission transmission
+
+rename fuelinformationcitympg citympg
+
+rename fuelinformationfueltype type
+
+rename fuelinformationhighwaympg highway_mpg
+
+rename identificationclassification classification
+
+rename identificationid ID
+
+rename identificationmake make
+
+rename identificationmodelyear model_year
+
+rename model_year year
+
+rename engineinformationenginestatistic horsepower
+
+rename v18 torque
+```
+
+## B: Restricting the data
+
+``` stata
+keep if type == "Gasoline"
+```
+
+## C: Regression
+
+To make stata see "year" as a categorical variable
+
+``` stata
+encode year, gen (year_categorical)
+
+regress c.highway_mpg c.horsepower c.torque c.height c.length c.width i.year_categorical
+```
+
+## D: Interaction
+
+I add the interaction through ##.
+
+``` stata
+regress highway_mpg horsepower torque c.horsepower##c.torque height length width year_categorical
+```
