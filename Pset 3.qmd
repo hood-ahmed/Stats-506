@@ -1,0 +1,511 @@
+---
+title: "Pset 3"
+author: "Hood Ahmed"
+format:
+  html:
+    embed-resources: true
+    code-overflow: wrap
+editor: visual
+---
+
+GitHub repository：https://github.com/hood-ahmed/Stats-506
+
+# Problem 1
+
+## A. Downloading & merging data
+
+*Downloading and merging the data*
+
+``` stata
+. * Read the VIX_D & DEMO_D dataset.
+. * Save it as a Stata dataset.
+global datadirectory C:\Users\hoodah\Downloads
+
+clear
+import sasxport5 "$datadirectory\VIX_D.XPT"
+    duplicates tag seqn, gen(tag)
+    assert tag==0
+    drop tag
+save "$datadirectory\VIX_D",replace
+
+clear
+import sasxport5 "$datadirectory\DEMO_D.XPT"
+    duplicates tag seqn, gen(tag)
+    assert tag==0
+    drop tag
+
+	merge 1:1 seqn using "$datadirectory\VIX_D"
+	/*
+	
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                         3,368
+        from master                     3,368  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                             6,980  (_merge==3)
+    -----------------------------------------
+
+	keep if _m==3
+	drop _m
+	di _N
+	*6980
+```
+
+## B. Estimating proportion
+
+*Estimate the proportion of respondents within each 10-year age bracket who wear glasses/contact lenses for distance vision. Produce a nice table with the results.*
+
+Based on viq240, I divide people into two category - "wear glasses or contacts" and "wear none".
+
+``` stata
+. * Creating Age Brackets
+sum ridageyr
+
+egen agegroup = cut(ridageyr), at(10(10)90) label
+
+gen wears_glasses_or_contacts = (viq240 == 1 | viq240 == 2 | viq240 == 3)
+
+tab agegroup wears_glasses_or_contacts, row nofreq
+
+           |    wears_glasses_or_contacts
+  agegroup |         0          1 |     Total
+-----------+----------------------+----------
+       10- |     78.43      21.57 |    100.00 
+       20- |     75.51      24.49 |    100.00 
+       30- |     70.90      29.10 |    100.00 
+       40- |     69.57      30.43 |    100.00 
+       50- |     49.76      50.24 |    100.00 
+       60- |     44.93      55.07 |    100.00 
+       70- |     38.59      61.41 |    100.00 
+       80- |     44.41      55.59 |    100.00 
+-----------+----------------------+----------
+     Total |     65.90      34.10 |    100.00 
+```
+
+Within the wears_glasses_or_contacts, there are three sub-categories - "glasses", "contact" and "both". Another table can reflect this sub-categories.
+
+``` stata
+. * Modify labels for viq240 to include a category for non-users.
+. label define viq240_label 1 "Glasses" 2 "Contacts" 3 "Both" 4 "None", replace
+
+. replace viq240 = 4 if viq240 != 1 & viq240 != 2 & viq240 != 3
+(4,600 real changes made)
+
+. label values viq240 viq240_label
+
+. tab agegroup viq240, row nofreq
+
+           |      Which type? Glasses or contacts?
+  agegroup |   Glasses   Contacts       Both       None |     Total
+-----------+--------------------------------------------+----------
+       10- |     14.05       7.07       0.45      78.43 |    100.00 
+       20- |     14.30       8.91       1.27      75.51 |    100.00 
+       30- |     19.68       7.70       1.71      70.90 |    100.00 
+       40- |     25.52       3.80       1.10      69.57 |    100.00 
+       50- |     46.43       3.80       0.00      49.76 |    100.00 
+       60- |     52.50       2.27       0.30      44.93 |    100.00 
+       70- |     60.77       0.64       0.00      38.59 |    100.00 
+       80- |     55.59       0.00       0.00      44.41 |    100.00 
+-----------+--------------------------------------------+----------
+     Total |     27.92       5.49       0.69      65.90 |    100.00 
+```
+
+## C. Logistic models
+
+Predictors:
+
+1.  age
+
+2.  age, race, gender
+
+3.  age, race, gender, Poverty Income ratio
+
+``` stata
+. * Model 1
+. logit wears_glasses_or_contacts ridageyr
+
+Iteration 0:   log likelihood = -4478.9233  
+Iteration 1:   log likelihood = -4183.3681  
+Iteration 2:   log likelihood =  -4181.457  
+Iteration 3:   log likelihood = -4181.4567  
+
+Logistic regression                             Number of obs     =      6,980
+                                                LR chi2(1)        =     594.93
+                                                Prob > chi2       =     0.0000
+Log likelihood = -4181.4567                     Pseudo R2         =     0.0664
+
+-------------------------------------------------------------------------------------------
+wears_glasses_or_contacts |      Coef.   Std. Err.      z    P>|z|     [95% Conf. Interval]
+--------------------------+----------------------------------------------------------------
+                 ridageyr |   .0284784   .0012043    23.65   0.000      .026118    .0308389
+                    _cons |  -1.789714   .0561758   -31.86   0.000    -1.899816   -1.679611
+-------------------------------------------------------------------------------------------
+
+. estimates store m1
+
+. local n1 = e(N)
+
+. local pseudoR21 = e(r2_p)
+
+. local ll1 = e(ll)
+
+. local aic1 = -2*`ll1' + 2*1 
+
+. outreg2 using results.doc, eform replace ctitle() addstat(Sample Size, e(N), Log Likelihood, `ll1', Pseudo R^2, e(r2_p), AIC, `aic1')
+
+. * Model 2
+. logit wears_glasses_or_contacts ridageyr ridreth1 riagendr
+
+Iteration 0:   log likelihood = -4478.9233  
+Iteration 1:   log likelihood = -4136.6769  
+Iteration 2:   log likelihood = -4133.3559  
+Iteration 3:   log likelihood = -4133.3541  
+Iteration 4:   log likelihood = -4133.3541  
+
+Logistic regression                             Number of obs     =      6,980
+                                                LR chi2(3)        =     691.14
+                                                Prob > chi2       =     0.0000
+Log likelihood = -4133.3541                     Pseudo R2         =     0.0772
+
+-------------------------------------------------------------------------------------------
+wears_glasses_or_contacts |      Coef.   Std. Err.      z    P>|z|     [95% Conf. Interval]
+--------------------------+----------------------------------------------------------------
+                 ridageyr |   .0286168   .0012192    23.47   0.000     .0262272    .0310065
+                 ridreth1 |   .1351966    .023254     5.81   0.000     .0896196    .1807735
+                 riagendr |   .4192284   .0536014     7.82   0.000     .3141715    .5242853
+                    _cons |  -2.826326   .1234478   -22.89   0.000    -3.068279   -2.584373
+-------------------------------------------------------------------------------------------
+
+. estimates store m2
+
+. local n2 = e(N)
+
+. local pseudoR22 = e(r2_p)
+
+. local ll2 = e(ll)
+
+. local aic2 = -2*`ll2' + 2*3 
+
+. outreg2 using results.doc, eform append ctitle() addstat(Sample Size, e(N), Log Likelihood, `ll2', Pseudo R^2, e(r2_p), AIC, `aic2')
+
+. * Model 3
+. logit wears_glasses_or_contacts ridageyr ridreth1 riagendr indfmpir
+
+Iteration 0:   log likelihood = -4277.4096  
+Iteration 1:   log likelihood = -3905.0737  
+Iteration 2:   log likelihood = -3900.1884  
+Iteration 3:   log likelihood = -3900.1829  
+Iteration 4:   log likelihood = -3900.1829  
+
+Logistic regression                             Number of obs     =      6,638
+                                                LR chi2(4)        =     754.45
+                                                Prob > chi2       =     0.0000
+Log likelihood = -3900.1829                     Pseudo R2         =     0.0882
+
+-------------------------------------------------------------------------------------------
+wears_glasses_or_contacts |      Coef.   Std. Err.      z    P>|z|     [95% Conf. Interval]
+--------------------------+----------------------------------------------------------------
+                 ridageyr |   .0276009    .001265    21.82   0.000     .0251215    .0300803
+                 ridreth1 |   .0880404   .0245416     3.59   0.000     .0399398     .136141
+                 riagendr |    .454698   .0552825     8.22   0.000     .3463463    .5630496
+                 indfmpir |    .188783   .0173202    10.90   0.000      .154836    .2227299
+                    _cons |  -3.174577   .1343728   -23.63   0.000    -3.437943   -2.911211
+-------------------------------------------------------------------------------------------
+
+. estimates store m3
+
+. local n3 = e(N)
+
+. local pseudoR23 = e(r2_p)
+
+. local ll3 = e(ll)
+
+. local aic3 = -2*`ll3' + 2*4  
+
+. outreg2 using results.doc, eform append ctitle() addstat(Sample Size, e(N), Log Likelihood, `ll3', Pseudo R^2, e(r2_p), AIC, `aic3')
+results.doc
+dir : seeout
+```
+
+We obtain this table
+
+![](images/table_result.jpeg){width="271"}
+
+## D. Interpretation
+
+*From the third model, discuss whether the odds of men and women being wears of glasess/contact differs.*
+
+*Test whether the proportion of wearers of glasses/contact differs between men and women.*
+
+``` stata
+. logit wears_glasses_or_contacts ridageyr ridreth1 riagendr indfmpir
+
+Iteration 0:   log likelihood = -4277.4096  
+Iteration 1:   log likelihood = -3905.0737  
+Iteration 2:   log likelihood = -3900.1884  
+Iteration 3:   log likelihood = -3900.1829  
+Iteration 4:   log likelihood = -3900.1829  
+
+Logistic regression                             Number of obs     =      6,638
+                                                LR chi2(4)        =     754.45
+                                                Prob > chi2       =     0.0000
+Log likelihood = -3900.1829                     Pseudo R2         =     0.0882
+
+-------------------------------------------------------------------------------------------
+wears_glasses_or_contacts |      Coef.   Std. Err.      z    P>|z|     [95% Conf. Interval]
+--------------------------+----------------------------------------------------------------
+                 ridageyr |   .0276009    .001265    21.82   0.000     .0251215    .0300803
+                 ridreth1 |   .0880404   .0245416     3.59   0.000     .0399398     .136141
+                 riagendr |    .454698   .0552825     8.22   0.000     .3463463    .5630496
+                 indfmpir |    .188783   .0173202    10.90   0.000      .154836    .2227299
+                    _cons |  -3.174577   .1343728   -23.63   0.000    -3.437943   -2.911211
+-------------------------------------------------------------------------------------------
+
+
+. prtest wears_glasses_or_contacts, by(riagendr)
+
+Two-sample test of proportions                     1: Number of obs =     3383
+                                                   2: Number of obs =     3597
+------------------------------------------------------------------------------
+       Group |       Mean   Std. Err.      z    P>|z|     [95% Conf. Interval]
+-------------+----------------------------------------------------------------
+           1 |   .3012119   .0078878                      .2857521    .3166718
+           2 |   .3783709   .0080864                      .3625218    .3942199
+-------------+----------------------------------------------------------------
+        diff |  -.0771589   .0112964                     -.0992994   -.0550185
+             |  under Ho:   .0113532    -6.80   0.000
+------------------------------------------------------------------------------
+        diff = prop(1) - prop(2)                                  z =  -6.7962
+    Ho: diff = 0
+
+    Ha: diff < 0                 Ha: diff != 0                 Ha: diff > 0
+ Pr(Z < z) = 0.0000         Pr(|Z| > |z|) = 0.0000          Pr(Z > z) = 1.0000
+```
+
+The coefficient for riagendr is statistically significant at 0.01 level, so there is evidence that the odds of wearing glasses/contact lenses for distance vision differs between men and women.
+
+The coefficient for the riagendr is .454698. The odds ratio is exp(.454698) = 1.5757.
+
+Therefore, as the predictor increases 1, the odds of the outcome occurring increase 57.57%. This means for being a female compared a male, the odds of wearing glasses/contact increase by about 57.57%.
+
+The test shows that the proportion of wearers of glasses/contact for female is .3783709, for male is .3012119. The p-value is below 0.01, so we reject the null hypothesis and conclude that there's a statistically significant difference in the proportion of glasses/contact lens wearers between male and female.
+
+# Problem 2 - Sakila
+
+## A. Language most common
+
+*Aside from English, what language is most common for films? Answer this with a single SQL query.*
+
+Two "language_id" variables exist in 2 tables. "language_id" is in FILM & LANGUAGE. I do an inner join.
+
+```{r}
+
+library(DBI)   
+setwd('C:/Users/hoods/OneDrive/Desktop/Stats 506/Psets/Pset 3')
+
+sakila <- dbConnect(RSQLite::SQLite(), "sakila_master.db")
+
+dbGetQuery(sakila, "SELECT b.language_id 
+           FROM Film AS b
+           INNER JOIN FILM AS p ON b.language_id = p.language_id
+LIMIT 5")
+
+  
+```
+
+After inspecting the variable, I find that English is the only language used in these films.
+
+## B Most common genre
+
+*What genre of movie is the most common in the data, and how many movies are of this genre?*
+
+```{r}
+
+film_category <- dbGetQuery(sakila, "SELECT * FROM film_category")
+
+category <- dbGetQuery(sakila, "SELECT * FROM category")
+
+film_counts <- table(film_category$category_id)
+
+# Get the most common genre ID
+most_common_genre_id <- as.integer(names(film_counts)[which.max(film_counts)])
+most_common_count <- max(film_counts)
+
+# Get the genre name
+
+most_common_genre_name <- subset(category, category_id == most_common_genre_id)$name
+
+print(most_common_genre_name)
+
+```
+
+The most common genre is sports.
+
+## C. Customers per country
+
+*Identify which country or countries have exactly 9 customers. Answer this with a single SQL query.*
+
+I start by retrieving the tables:
+
+```{r}
+
+sakila <- dbConnect(RSQLite::SQLite(), "sakila_master.db")
+
+# customer table
+customer <- dbGetQuery(sakila, "SELECT * FROM customer")
+address <- dbGetQuery(sakila, "SELECT * FROM address")
+
+# city table
+city <- dbGetQuery(sakila, "SELECT * FROM city")
+
+# country table
+country <- dbGetQuery(sakila, "SELECT * FROM country")
+```
+
+In regular R:
+
+```{r}
+
+# Merge customer with address
+customer_address <- merge(customer, address, by="address_id")
+
+# Merge the above result with city
+customer_address_city <- merge(customer_address, city, by="city_id")
+
+# Merge the above result with country
+merged_data <- merge(customer_address_city, country, by="country_id")
+
+# Count the number of customers per country
+country_counts <- table(merged_data$country)
+
+# Filter countries with 9 customers
+countries_with_9_customers <- names(country_counts[country_counts == 9])
+
+print(countries_with_9_customers)
+```
+
+The United Kingdom
+
+In SQL
+
+```{r}
+dbGetQuery(sakila, "
+SELECT country, COUNT(customer_id) AS customer_count
+FROM customer
+JOIN address ON customer.address_id = address.address_id
+JOIN city ON address.city_id = city.city_id
+JOIN country ON city.country_id = country.country_id
+GROUP BY country
+HAVING customer_count = 9;
+")
+```
+
+The country that has customers of 9 is the United Kingdom.
+
+# Problem 3
+
+## A. Domain
+
+*What proportion of email addresses are hosted at a domain with TLD ".net"?*
+
+```{r}
+
+data <- read.csv('us-500.csv')
+
+length(data$email[grep(".net$", data$email)]) 
+# there are 70 emails ending with ".net".
+
+proportion <- length(data$email[grep(".net$", data$email)]) /
+                 length(data$email)
+
+print(proportion)
+```
+
+The proportion is 14%.
+
+## B. *alphanumeric*
+
+*What proportion of email addresses have at least one non alphanumeric character in them?*
+
+```{r}
+
+non_alphaneumeric <- sum(grepl("[^[:alnum:]@.]", data$email))
+
+prop.non_alphaneumeric <- non_alphaneumeric/nrow(data)
+print(prop.non_alphaneumeric)
+```
+
+The proportion is 24%.
+
+## C. Most common area code
+
+```{r}
+# extract the  numbers
+extracted_numbers <- gsub("[^0-9]", "", data$phone1)
+
+# Take the first three digits from each observation
+first_three_numbers <- substr(extracted_numbers, 1, 3)
+
+# Count occurrences of each number
+number_counts <- table(first_three_numbers)
+
+# Find the most common number
+most_common_number <- names(number_counts)[which.max(number_counts)]
+
+cat("Most common number:", most_common_number, "\n")
+```
+
+The most common area code is 973
+
+## D. Histogram
+
+```{r}
+
+extracted_numbers_address <- gsub(".*#(\\d+)$", "\\1", data$address)
+apartment_numbers <- as.numeric(extracted_numbers_address)
+
+cleaned_data <- na.omit(apartment_numbers)
+
+log_cleaned <- log(cleaned_data)
+
+hist(log_cleaned, main="apartment numbers", xlab="log of the apartment numbers", ylab="Frequency", col="skyblue", border="black")
+
+```
+
+## E. Benford's law 
+
+According to Benford's Law, the distribution of leading digits is expected to be: 1: 30.1% 2: 17.6% 3: 12.5% 4: 9.7% 5: 7.9% 6: 6.7% 7: 5.8% 8: 5.1% 9: 4.6%
+
+```{r}
+
+benford_first <- c(0.301, 0.176, 0.125, 0.097, 0.079, 0.067, 0.058, 0.051, 0.046)
+benford <- log10(1 + 1 / (1:9))
+barplot(benford)
+
+leading_digits <- as.integer(substr(apartment_numbers, 1, 1))
+# Calculate observed frequencies
+observed_first <- table(leading_digits) / length(leading_digits)
+head(observed_first)
+
+# Compare visually using a barplot
+barplot(rbind(observed_first, benford), beside = TRUE, legend.text = c("Data", "Benford")) 
+```
+
+The apartment numbers do not appear to follow Benford\'s law.
+
+## F. last digit of the street number
+
+```{r}
+
+# extracting last digit of the street number
+st_number <- sub("^(\\d+).*", "\\1", data$address)
+st_number <- as.integer(st_number)
+last_digits <- as.integer(substr(st_number, nchar(st_number), nchar(st_number)))
+
+last <- table(last_digits) / length(last_digits)
+head(last)
+
+# Comparing 
+barplot(last)
+```
