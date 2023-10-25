@@ -1,0 +1,454 @@
+---
+title: "Problem Set 4"
+author: "Hood Ahmed"
+format:
+  html:
+    embed-resources: true
+    code-overflow: wrap
+editor: visual
+---
+
+Note: I got a one day extension from the professor due to illness.
+
+GitHub: <https://github.com/hood-ahmed/Stats-506>
+
+# Problem 1 - Tidyverse
+
+## Part A
+
+*Table for mean and median departure delay per airport. Exclude any destination with under 10 flights. Do this exclusion through code, not manually.*
+
+```{r}
+library(nycflights13)
+library(tidyverse)
+data("flights")
+data("airports")
+
+#  mean and median departure delay per airport
+dep_delays <- flights %>%
+  # Group data by departure airport
+  group_by(origin) %>%
+  summarise(
+    mean_delay = mean(dep_delay, na.rm = TRUE),
+    median_delay = median(dep_delay, na.rm = TRUE),
+    # Ensures the resulting tibble is ungrouped
+    .groups = "drop"
+  ) %>%
+  
+  # Order by mean delay in desc order
+  arrange(-mean_delay) %>%
+  # Join with the airports to get the airports' names
+  left_join(airports, by = c("origin" = "faa")) %>%
+  # Select the columns to display
+  select(name, mean_delay, median_delay)
+
+print(dep_delays)
+
+
+```
+
+*Generate a second table reporting the mean and median arrival delay per airport.*
+
+```{r}
+
+#  mean and median arrival delay per airport
+arriv_delays <- flights %>%
+  # Group data by destination airport
+  group_by(dest) %>%
+  # Summarise the mean and median arrival delays
+  summarise(
+    mean_delay = mean(arr_delay, na.rm = TRUE),
+    median_delay = median(arr_delay, na.rm = TRUE),
+    flight_count = n(),
+    # Ensures the resulting tibble is ungrouped
+    .groups = "drop"
+  ) %>%
+  # Filter out destinations with < 10 flights
+  filter(flight_count >= 10) %>%
+  # Order by mean delay in desc order
+  arrange(-mean_delay) %>%
+  # Get the airports' names
+  left_join(airports, by = c("dest" = "faa")) %>%
+  # Select the columns to display
+  select(name, mean_delay, median_delay)
+
+print(arriv_delays, n = nrow(arriv_delays))
+```
+
+## Part B
+
+```{r}
+data("planes")
+
+# Calculate average speed, group by aircraft model
+fastest_aircraft <- flights %>%
+  # Filter out distance or air_time is NA
+  filter(!is.na(distance), !is.na(air_time)) %>%
+  
+  # Calculate average speed
+  mutate(speed_mph = distance / (air_time / 60)) %>%
+  
+  # Group by tailnum (representing aircraft model)
+  group_by(tailnum) %>%
+  
+  # Summarize average speed and number of flights
+  summarise(
+    avg_speed = mean(speed_mph, na.rm = TRUE),
+    num_flights = n()
+  ) %>%
+  
+  # Arrange by average speed in desc order and take the first row
+  arrange(desc(avg_speed)) %>%
+  slice(1)
+
+fastest_aircraft
+
+```
+
+# Problem 2
+
+```{r}
+
+library(tidyverse)
+
+#' @param month a number or string
+#' @param year a number
+#' @param data the dataset to use
+#' @param celsius a boolean to check if return degrees in celsius, defaults to farenheit 
+#' @param average_fn an optional function, defaults to mean
+#'
+#' @return the average temperature
+get_temp <- function(month, year, data, celsius = FALSE, average_fn = mean) {
+  result <- tryCatch({
+    # Sanitize input
+    if (is.numeric(month)) {
+      if (month < 1 || month > 12) {
+        stop("month should be between 1 and 12")
+      }
+      month_num <- month
+    } else if (is.character(month)) {
+      month <- match(month, c(month.abb, month.name), nomatch = 0)
+      
+      if (month > 12){
+        month <-  month - 12
+      }
+      if (month == 0) {
+        stop("Invalid month name")
+      }
+    } else {
+      stop("Month must be a number or a string")
+    }
+    month_num <- as.integer(month)
+    
+    year_num <- year
+    if (!is.numeric(year_num) || (year_num > max(data$year))) {
+      stop("Year must be an integer and be within range")
+    }
+    
+    if (!is.data.frame(data)) {
+      stop("Data must be a data frame")
+    }
+    
+    if (!is.logical(celsius)) {
+      stop("Celsius must be a logical value")
+    }
+    
+    if (!is.function(average_fn)) {
+      stop("average_fn must be a function")
+    }
+    # Convert temperature to Celsius
+    if (celsius) {
+      data <- data %>%
+        mutate(temp = (temp - 32) * 5 / 9)
+    }
+    # Filter data by month and year, Calculate average temperature
+    data_temp <- data %>%
+      filter(month_numeric == month_num, year == year_num) %>%
+      summarise(avg_temp = average_fn(temp))
+      #pull(avg_temp)
+      data_temp$avg_temp
+  }, error = function(e) {
+    message("Error: ", e$message)
+    NA_real_
+  })
+  
+  return(result)
+}
+
+# Load the Chicago NNMAPS data
+
+nnmaps <- read.csv("chicago-nmmaps.csv", header = TRUE)
+test1 <- get_temp("Apr", 1999, data = nnmaps)
+test2 <- get_temp("Apr", 1999, data = nnmaps, celsius = TRUE)
+test3 <- get_temp(10, 1998, data = nnmaps, average_fn = median)
+test4 <- get_temp(13, 1998, data = nnmaps)
+test5 <- get_temp(2, 2005, data = nnmaps)
+test6 <- get_temp("November", 1999, data =nnmaps, celsius = TRUE,
+         average_fn = function(x) {
+           x %>% sort -> x
+           x[2:(length(x) - 1)] %>% mean %>% return
+         })
+print(test1)
+print(test2)
+print(test3)
+print(test4)
+print(test5)
+print(test6)
+```
+
+# Problem 3 - SAS
+
+``` sas
+proc import datafile="C:/Users/hoodah/Downloads/recs2020_public_v5.csv" out=recs2020 dbms=csv replace;
+  getnames=yes;
+run;
+```
+
+## Part A
+
+``` sas
+proc freq data=recs2020 order=freq;
+  tables state_name;
+  weight nweight;
+run;
+```
+
+California has the highest percentage of records; Michigan is 3.17%.
+
+## Part B
+
+``` sas
+proc sgplot data=recs2020;
+  where dollarel > 0;
+  histogram dollarel;
+run;
+```
+
+![](3b.png)
+
+## Part C
+
+``` sas
+data recs2020_log;
+  set recs2020;
+  where dollarel > 0 ;
+  logdollarel = log(dollarel);
+run;
+
+proc sgplot data=recs2020_log;
+  histogram logdollarel;
+run;
+```
+
+![](3c.png)
+
+## Part D
+
+``` sas
+proc reg data= recs2020_log;
+    where prkgplc1 >= 0 ;
+    weight nweight;
+    model logdollarel = totrooms prkgplc1;
+    output out=predicted_values pred=pred;
+run;
+```
+
+![](Screenshot%20(750).png){width="444"}
+
+## Part E
+
+``` sas
+data predicted_values;
+   set predicted_values;
+   predicted_cost = exp(pred);
+run;
+    
+proc sgplot data=predicted_values;
+  scatter x=dollarel y=predicted_cost;
+run;
+```
+
+![](download.png){width="390"}
+
+# Problem 4 - Multiple tools
+
+## Part A
+
+It was generated using Stata.
+
+## Part B
+
+``` sas
+proc import datafile="/home/hoodah/Downloads/public2022.csv" out=public2022 dbms=csv replace;
+  getnames=yes;
+run;
+
+/*b*/
+proc sql; 
+  create table subset_data as 
+  select public2022.CaseID, public2022.weight_pop, public2022.b3, public2022.nd2, public2022.b7_a, public2022.gh1, public2022.educ_4cat, public2022.ppethm 
+  from public2022;
+quit;
+```
+
+## Part C
+
+``` sas
+proc export data=subset_data outfile="/home/hoodah/Downloads/subdataset.csv" dbms=csv replace;
+run;
+```
+
+## Part D
+
+``` stata
+. 
+. cd "/Users/hoodah/Downloads"
+/Users/hoodah/Downloads
+
+. 
+end of do-file
+
+. do "/var/folders/l1/y65z_mxj42s8n3793_nb4fv00000gn/T//SD42413.000000"
+
+. log using hw4_p4.log, replace
+(note: file /Users/jiaqizhu/Downloads/506/hw4_p4.log not found)
+-------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /Users/jiaqizhu/Downloads/506/hw4_p4.log
+  log type:  text
+ opened on:  23 Oct 2023, 02:15:08
+
+
+. import delimited "subdataset.csv"
+(8 vars, 11,667 obs)
+
+. 
+. describe
+
+Contains data
+  obs:        11,667                          
+ vars:             8                          
+ size:     1,995,057                          
+-------------------------------------------------------------------------------------------------------
+              storage   display    value
+variable name   type    format     label      variable label
+-------------------------------------------------------------------------------------------------------
+caseid          int     %8.0g                 CaseID
+weight_pop      float   %9.0g                 
+b3              str19   %19s                  B3
+nd2             str15   %15s                  ND2
+b7_a            str9    %9s                   B7_a
+gh1             str57   %57s                  GH1
+educ_4cat       str43   %43s                  
+ppethm          str22   %22s                  
+-------------------------------------------------------------------------------------------------------
+Sorted by: 
+     Note: Dataset has changed since last saved.
+```
+
+## Part D
+
+``` stata
+
+. gen sameorbetter = 0
+
+. replace sameorbetter = 1 if b3 == "Much better off" | b3 == "About the same" | b3 == "Somewhat better
+>  off"
+(7,371 real changes made)
+```
+
+## Part F
+
+``` stata
+
+. encode nd2, generate(nd2_num)
+
+. encode b7_a, generate(b7_a_num)
+
+. encode gh1, generate(gh1_num)
+
+. encode educ_4cat, generate(educ_4cat_num)
+
+. encode ppethm, generate(ppethm_num)
+
+. svyset caseid [pw=weight_pop]
+
+      pweight: weight_pop
+          VCE: linearized
+  Single unit: missing
+     Strata 1: <one>
+         SU 1: caseid
+        FPC 1: <zero>
+        
+
+. svy: logistic sameorbetter i.nd2_num i.b7_a_num i.gh1_num i.educ_4cat_num i.ppethm_num
+(running logistic on estimation sample)
+
+Survey: Logistic regression
+
+Number of strata   =         1                Number of obs     =       11,667
+Number of PSUs     =    11,667                Population size   =  255,114,223
+                                              Design df         =       11,666
+                                              F(  17,  11650)   =        55.33
+                                              Prob > F          =       0.0000
+
+------------------------------------------------------------------------------------------------------
+                                     |             Linearized
+                        sameorbetter | Odds Ratio   Std. Err.      t    P>|t|     [95% Conf. Interval]
+-------------------------------------+----------------------------------------------------------------
+                             nd2_num |
+                        Much higher  |   1.005597   .0852199     0.07   0.947     .8516883    1.187317
+                         Much lower  |   1.266262   .1916566     1.56   0.119     .9411859    1.703615
+                    Somewhat higher  |   1.069642   .0576705     1.25   0.212     .9623668    1.188876
+                     Somewhat lower  |    1.29174   .2400072     1.38   0.168     .8974373    1.859285
+                                     |
+                            b7_a_num |
+                               Good  |   .4321301   .0847103    -4.28   0.000     .2942636    .6345889
+                          Only fair  |   .1669033   .0323953    -9.22   0.000     .1140862    .2441727
+                               Poor  |   .0742946   .0147228   -13.12   0.000     .0503801    .1095609
+                                     |
+                             gh1_num |
+Own your home free and clear (wi..)  |   .6675017   .0681022    -3.96   0.000     .5465113     .815278
+Own your home with a mortgage or ..  |   .6849157   .0672549    -3.85   0.000     .5649957    .8302885
+                           Pay rent  |   .7751127   .0788138    -2.51   0.012     .6350462    .9460723
+                                     |
+                       educ_4cat_num |
+          High school degree or GED  |   .8674937    .055261    -2.23   0.026     .7656629    .9828678
+     Less than a high school degree  |   .8217839   .0900249    -1.79   0.073       .66298    1.018626
+Some college/technical or associa..  |   .9094292   .0478303    -1.81   0.071     .8203446    1.008188
+                                     |
+                          ppethm_num |
+                Black, Non-Hispanic  |   2.596571   .3840787     6.45   0.000     1.943029    3.469932
+                           Hispanic  |   1.448566   .2069499     2.59   0.010     1.094759    1.916718
+                Other, Non-Hispanic  |   1.708015   .2969877     3.08   0.002     1.214704    2.401668
+                White, Non-Hispanic  |   1.098153   .1428509     0.72   0.472     .8509904    1.417102
+                                     |
+                               _cons |   10.64902   2.594703     9.71   0.000      6.60522    17.16848
+------------------------------------------------------------------------------------------------------
+Note: _cons estimates baseline odds.
+```
+
+As we can see from the results, the p-value of all nd2_num variable levels are not significant at 0.1 level, so we **cannot** say whether the respondent's family is better off, the same, or worse off finanicially compared to 12 month's ago can be predicted by thinking that the chance of experiencing a natural disaster or severe weather event will be higher, lower or about the same in 5 years.
+
+## Part G
+
+``` stata
+save "/Users/C:/Users/hoods/OneDrive/Desktop/Stats 506/Psets/Pset 4/statadata.dta"
+```
+
+## Part H
+
+```{r}
+install.packages("survey")
+library(survey)
+library(haven)
+dat <- read_dta("statadata.dta")
+design <- svydesign(id = ~ caseid, weight = ~ weight_pop, data = dat)
+
+mod <- svyglm(sameorbetter ~ as.factor(nd2_num) + as.factor(b7_a_num) + as.factor(gh1_num) + as.factor(educ_4cat_num) + as.factor(ppethm_num), family = "binomial", design=design)
+
+psrsq(mod)
+
+```
+
+so the pseudo- R\^2 value is 0.1.
