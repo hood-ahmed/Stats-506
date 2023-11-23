@@ -1,0 +1,289 @@
+---
+title: "Pset 5"
+author: "Hood Ahmed"
+format: 
+  html:
+    embed-resources: true
+    code-overflow: wrap
+editor: visual
+---
+
+GitHub repository：<https://github.com/hood-ahmed/Stats-506>
+
+## **Problem 1 - Plotting**
+
+Use the "nnmaps" data set again. I'd recommend using **ggplot2** for these, but you can do them in base R or **plotly** if you'd prefer.
+
+```{r}
+library(assertthat)
+library(ggplot2)
+
+nnmaps <- read.csv("chicago-nmmaps.csv")
+
+```
+
+a.  Produce a graph of the **mean** monthly temperature in **celsius**. Draw a scatter-plot where the x-axis is month and the y-axis is the average monthly temperature in celsius. Add a line connecting the points within each season and color the lines and points by season (same color for lines and points in the same season). Be sure both x-axis and the legend are ordered appropriately, and that all labels/titles are clear and ready for publication (e.g. no variable names).
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(scales)
+df <- nnmaps
+df$temp_cels <- (df$temp - 32) * (5/9)
+
+df_2 <- df %>% mutate(date = as.POSIXct(date, format = '%Y-%m-%d'), year_2 = format(date, "%Y"), yearmon = format(date, "%Y-%m")) %>%
+  group_by(year, yearmon, month, season) %>%
+  summarize(mean_cels = mean(temp_cels))
+df_2$yearmon_2 <- paste0(df_2$yearmon, '-01')
+df_2$yearmon_2 <- as.Date(df_2$yearmon_2, format = '%Y-%m-%d')
+df_2$yearmon <- (paste("01-","",df_2$yearmon))
+
+ggplot(df_2, aes(x = yearmon_2, y = mean_cels, color = season, group = season)) +
+  geom_point() +
+  geom_line() +
+  ggtitle("Mean Monthly Temperature in Celsius") +
+  scale_x_discrete(name = "Month-Year") +
+  scale_color_discrete(name = "Seasons") +
+  scale_x_date(date_breaks = '1 month', date_labels = "%b-%Y") +
+  xlab("Month-Year") +
+  ylab("Temperature in Celsius") +
+  theme(plot.title = element_text(color="black", size=12, face="bold"),
+        axis.title.x = element_text(color="black", size=10, face="plain"),
+        axis.title.y = element_text(color="black", size=10, face="plain"),
+        axis.line = element_line(colour = "black"),
+        axis.text.x = element_text(size = 6, angle = 90)) +
+  scale_color_manual("Seasons",values=c("brown", "green4", "gold3", "blue4")) 
+```
+
+b\. Produce a similar plot with four sets of lines: mean monthly temperature in celsius, mean montly O3, mean monthly PM10, and mean monthly dewpoint. Figure out a way to distinguish between the four lines. Again, make sure the plot is publication-ready (clean and clear labels). Use the plot to answer the following question:
+
+```{r}
+df_3 <- df %>% mutate(date = as.POSIXct(date, format = '%Y-%m-%d'), year_2 = format(date, "%Y"), yearmon = format(date, "%Y-%m")) %>%
+  group_by(year, yearmon, month, season) %>%
+  summarize(mean_cels = mean(temp_cels, na.rm = TRUE),
+            mean_o3 = mean(o3, na.rm = TRUE),
+            mean_pm10 = mean(pm10, na.rm = TRUE),
+            mean_dp = mean(dewpoint, na.rm = TRUE))
+
+df_3$yearmon_3 <- paste0(df_3$yearmon, '-01')
+df_3$yearmon_3 <- as.Date(df_3$yearmon_3, format = '%Y-%m-%d')
+
+ggplot() +
+  geom_line(df_3, mapping = aes(x=yearmon_3, y = mean_cels, color = "red4")) +
+  geom_point(df_3, mapping = aes(x=yearmon_3, y = mean_cels, color = "red4")) +
+  geom_line(df_3, mapping = aes(x=yearmon_3, y = mean_o3, color = "blue4")) +
+  geom_point(df_3, mapping = aes(x=yearmon_3, y = mean_o3, color = "blue4")) +
+  geom_line(df_3, mapping = aes(x=yearmon_3, y = mean_pm10, color = "green4")) +
+  geom_point(df_3, mapping = aes(x=yearmon_3, y = mean_pm10, color = "green4")) +
+  geom_line(df_3, mapping = aes(x=yearmon_3, y = mean_dp, color = "orange2")) +
+  geom_point(df_3, mapping = aes(x=yearmon_3, y = mean_dp, color = "orange2")) +
+  facet_wrap(~season) +
+  scale_x_date(date_breaks = '2 months', date_labels = "%b-%Y") +
+  ggtitle("Monthly Means of Temperature, O3, PM10 and Dew Point") +
+  xlab("Month-Year") +
+  ylab("Averages") +
+  theme(plot.title = element_text(color="black", size=12, face="bold"),
+        axis.title.x = element_text(color="black", size=10, face="plain"),
+        axis.title.y = element_text(color="black", size=10, face="plain"),
+        axis.line = element_line(colour = "black"),
+        axis.text.x = element_text(size = 6, angle = 90)) +
+  scale_color_identity(name = "Type",
+                       labels = c("Temp in Cels","O3","PM10","Dew Point"),
+                       guide = "legend")
+```
+
+**"Which of the four variables seems to have the least seasonal trend?"**
+
+"Temperature in Celsius" has the least seasonal trend.
+
+## **Problem 2 - OOP Programming**
+
+```{r}
+library(methods)
+
+# Define the poly class
+#' Poly Class
+#'
+#' A class to represent polynomial expressions.
+#' @slot coefficients numeric Coefficients of the polynomial.
+#' @slot powers numeric Powers corresponding to each coefficient in the polynomial.
+setClass("poly", 
+         slots = c(coefficients = "numeric", powers = "numeric"))
+
+# Constructor for the poly class
+#' A constructor for the poly class.
+#' @param coefficients numeric vector of coefficients.
+#' @param powers numeric vector of powers.
+#' @return An object of class \code{poly}.
+#' @examples
+#' p1 <- make_poly(c(3, 2), c(2, 0)) # 3x^2 + 2
+#' p2 <- make_poly(c(7, -2, -1, 17), c(3, 2, 1, 0)) # 7x^3 - 2x^2 - x + 17
+#' @export
+make_poly <- function(coefficients, powers) {
+  # Create a data frame for ease of manipulation
+  poly_df <- data.frame(coefficients = coefficients, powers = powers)
+
+  # Sum coefficients for like powers and sort by powers
+  poly_df <- aggregate(coefficients ~ powers, data = poly_df, sum)
+  poly_df <- poly_df[order(-poly_df$powers), ]
+
+  # Create the poly object
+  new("poly", coefficients = poly_df$coefficients, powers = poly_df$powers)
+}
+
+# Validator
+setValidity("poly", function(object) {
+  if(length(object@coefficients) != length(object@powers)) {
+    return("Length of coefficients and powers should be the same")
+  }
+  TRUE
+})
+
+# Show method
+#' Print Poly Object
+#'
+#' Method to print objects of the `poly` class.
+#' @param object The `poly` object to be printed.
+#' @export
+setMethod("show", "poly", function(object) {
+  terms <- mapply(function(coef, power) {
+    term <- ""
+    if (coef != 0) {
+      # Determine the sign of the term
+      sign <- ifelse(coef >= 0, " + ", " - ")
+      
+      abs_coef <- abs(coef)
+
+      # Formatting the term based on its power
+      if (power == 0) {  # Only display the coefficient for power 0
+        term <- paste0(abs_coef)
+      } else if (power == 1) {  # Display 'x' without power for power 1
+        term <- paste0(abs_coef, "x")
+      } else {  # Regular format for other powers
+        term <- paste0(abs_coef, "x^", power)
+      }
+
+      # Prepend the sign for all terms except the first term
+      if (!identical(terms, character(0))) {
+        term <- paste0(sign, term)
+      }
+    }
+    term
+  }, object@coefficients, object@powers, SIMPLIFY = FALSE)
+  
+  terms <- terms[terms != ""]
+  polynomial_string <- paste(terms, collapse = "")
+  
+  cat(polynomial_string, "\n")
+})
+
+# Addition method
+#' Add Poly Objects
+#'
+#' Method to add two `poly` objects.
+#' @param e1 The first `poly` object.
+#' @param e2 The second `poly` object.
+#' @return The sum of e1 and e2 as a new `poly` object.
+#' @export
+setMethod("+", c("poly", "poly"), function(e1, e2) {
+  new_coefficients <- c(e1@coefficients, e2@coefficients)
+  new_powers <- c(e1@powers, e2@powers)
+  make_poly(new_coefficients, new_powers) # Simplification not handled
+})
+
+# Subtraction method
+#' Subtract Poly Objects
+#'
+#' Method to subtract two `poly` objects.
+#' @param e1 The first `poly` object.
+#' @param e2 The second `poly` object.
+#' @return The difference of e1 and e2 as a new `poly` object.
+#' @export
+setMethod("-", c("poly", "poly"), function(e1, e2) {
+  new_coefficients <- c(e1@coefficients, -e2@coefficients)
+  new_powers <- c(e1@powers, e2@powers)
+  make_poly(new_coefficients, new_powers) 
+})
+
+# Test the class and methods
+p1 <- make_poly(c(3, 2), c(2, 0)) # 3x^2 + 2
+p2 <- make_poly(c(7, -2, -1, 17), c(3, 2, 1, 0)) # 7x^3 - 2x^2 - x + 17
+
+p1
+p2
+p1 + p2
+p1 - p2
+```
+
+## **Problem 3 - data.table**
+
+Generate a table reporting the mean and median departure delay per airport. Generate a second table reporting the mean and median arrival delay per airport. Exclude any destination with under 10 flights.
+
+```{r}
+
+library(nycflights13)
+library(data.table)
+# Convert flights data to data.table
+flights_dt <- as.data.table(flights)
+airports_dt <- as.data.table(airports)
+
+# Aggregate departure delays
+dep_delay_agg <- flights_dt[, .(mean_dep_delay = mean(dep_delay, na.rm = TRUE),
+                                median_dep_delay = median(dep_delay, na.rm = TRUE),
+                                num_flights = .N), by = .(origin)]
+
+# Filter for airports with at least 10 flights
+dep_delay_agg <- dep_delay_agg[num_flights >= 10]
+
+# Join with airport names and order
+dep_delay_table <- dep_delay_agg[airports_dt, .(airport = name, mean_dep_delay, median_dep_delay), on = .(origin = faa)]
+dep_delay_table <- dep_delay_table[!is.na(mean_dep_delay) & !is.na(median_dep_delay)]
+dep_delay_table <- dep_delay_table[order(-mean_dep_delay)]
+
+# Print the departure delay table
+print(dep_delay_table, nrow = nrow(dep_delay_table))
+
+# Aggregate arrival delays
+arr_delay_agg <- flights_dt[, .(mean_arr_delay = mean(arr_delay, na.rm = TRUE),
+                                median_arr_delay = median(arr_delay, na.rm = TRUE),
+                                num_flights = .N), by = .(dest)]
+
+# Filter for airports with at least 10 flights
+arr_delay_agg <- arr_delay_agg[num_flights >= 10]
+
+# Join with airport names and order
+arr_delay_table <- arr_delay_agg[airports_dt, .(airport = name, mean_arr_delay, median_arr_delay), on = .(dest = faa)]
+arr_delay_table <- arr_delay_table[!is.na(mean_arr_delay) & !is.na(median_arr_delay)]
+arr_delay_table <- arr_delay_table[order(-mean_arr_delay)]
+
+# Print the arrival delay table
+print(arr_delay_table, nrow = nrow(arr_delay_table))
+
+```
+
+b.  How many flights did the aircraft model with the fastest average speed take? Produce a tibble with 1 row, and entires for the model, average speed (in MPH) and number of flights.
+
+```{r}
+
+flights_dt <- as.data.table(flights)
+planes_dt <- as.data.table(planes)
+
+fastest_aircraft_model <- flights_dt[
+  # Join with planes_dt data
+  planes_dt, on = "tailnum", nomatch = 0
+  ][
+  # Compute time in hours and mph
+  , .(time = air_time / 60, distance = distance, model = model)
+  ][
+  # Compute mph
+  , mph := distance / time
+  ][
+  # Group by model and calculate average mph and number of flights
+  , .(avgmph = mean(mph, na.rm = TRUE), nflights = .N), by = .(model)
+  ][
+  # Arrange in descending order of avgmph and get the top row
+  order(-avgmph)
+  ][1]
+
+fastest_aircraft_model
+```
