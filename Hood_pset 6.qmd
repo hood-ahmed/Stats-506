@@ -1,0 +1,126 @@
+---
+title: "Pset 6"
+author: "Hood Ahmed"
+format:
+  html:
+    toc: true
+    embed-resources: true
+editor: visual
+---
+
+GitHub repository：<https://github.com/hood-ahmed/Stats-506>
+
+## **Stratified Bootstrapping** 
+
+If a sample has a categorical variable with small groups, bootstrapping can be tricky. Consider a situation where `n = 100`, but there is some categorical variable `g` where category `g = 1` has only 2 observations. If we resample with replacement 100 times from those observations, there is a
+
+$$
+\bigg ( \frac{98}{100} \bigg )^{100} \approx 13 \%
+$$
+
+chance that the bootstrap sample does not include either observation from `g = 1`. This implies that if we are attempting to obtain a bootstrap estimate in group `g = 1`, 13% of the bootstrapped samples will have no observations from that group and thus unable to produce an estimate.
+
+A way around this is to carry out stratified bootstrap: Instead of taking a sample with replacement of the whole sample, take separate samples with replacement within each strata of the same size of the strata, then combine those resamples to generate the bootstrap sample.
+
+Use the `flights` data from the **nycflights13** package. Use stratafied bootstrapping by `dests` to estimate the average `air_time` for flights within each `origin` and produce a table including the estimates and confidence intervals for each `origin`.
+
+Carry this out two ways:
+
+1.  Without any parallel processing
+
+2.  With some form of parallel processing (either **parallel** or **futures** package). (For very minor extra credit, implement with both packages.)
+
+Generate at least 1,000 bootstrapped samples. Report the performance difference between the versions.
+
+First, let's try to do this without any parallel processing and start by loading the data:
+
+```{r}
+library(nycflights13)
+library(tidyverse)
+library(dplyr)
+library(purrr)
+library(broom)
+library(boot)
+library(parallel)
+library(doParallel)
+flights <- flights
+```
+
+I will use $1,005$.
+
+```{r}
+num_bootstraps <- 1005
+```
+
+I use pipes to stratify by `dest` to estimate the `air_time` for flights from each `origin`:
+
+```{r}
+bootstrap_results <- flights %>% 
+  group_by(origin, dest) %>%
+  nest() %>% # each element in list (by origin, dest) will contain subset of data for specific     combination of origin and dest
+  mutate(
+    bootstrap_samples = map(data, ~replicate(num_bootstraps, sample(.x$air_time, replace = TRUE))),
+    mean_air_time = map_dbl(bootstrap_samples, ~mean(.x, na.rm=TRUE)), # map_dbl is a variant of map specifically designed for mapping functions that return double values.
+    confidence_intervals = map(bootstrap_samples, ~quantile(.x, c(0.025, 0.975), na.rm = TRUE))
+  ) %>%
+  unnest_wider(confidence_intervals) %>%
+  rename(lower_ci = `2.5%`, upper_ci = `97.5%`) %>%
+  filter(!is.nan(mean_air_time)) %>%
+  select(origin, dest, mean_air_time, lower_ci, upper_ci)
+```
+
+I produce a table including the estimates and confidence intervals for each `origin`:
+
+```{r}
+summary_table <- bootstrap_results %>%
+  group_by(origin) %>%
+  summarize(
+    mean_air_time = mean(mean_air_time),
+    lower_ci = min(lower_ci),
+    upper_ci = max(upper_ci)
+  )
+
+# Print or view the summary table
+print(summary_table)
+```
+
+For parallel processing, `parLapply()` is used for parallel mapping instead of `map()`, which was used for non parallel processing:
+
+```{r}
+num_bootstraps <- 2
+
+cl <- makeCluster(detectCores()) #creates a parallel processing cluster with the number of cores detected on your machine.
+clusterExport(cl, "num_bootstraps")  # Export num_bootstraps to the cluster
+registerDoParallel(cl) #registers the parallel backend for the foreach and related functions to use the cluster.
+
+bootstrap_results <- flights %>% 
+  group_by(origin, dest) %>%
+  nest() %>%
+  mutate(
+    bootstrap_samples = parLapply(cl, data, function(.x) replicate(num_bootstraps, sample(.x$air_time, replace = TRUE))),
+    mean_air_time = parLapply(cl, bootstrap_samples, function(.x) mean(.x, na.rm = TRUE)),
+    confidence_intervals = parLapply(cl, bootstrap_samples, function(.x) quantile(.x, c(0.025, 0.975), na.rm = TRUE))
+  ) %>%
+  unnest(cols = c(mean_air_time, confidence_intervals)) %>%
+  filter(!sapply(mean_air_time, function(x) any(is.nan(x)))) %>%
+  mutate(
+    lower_ci = "0.025",
+    upper_ci = "0.975"
+  ) %>%
+  select(origin, dest, mean_air_time,lower_ci, upper_ci)
+
+# Stop the parallel processing cluster
+stopCluster(cl)
+
+# Summarize results by grouping on 'origin'
+summary_table <- bootstrap_results %>%
+  group_by(origin) %>%
+  summarize(
+    mean_air_time = mean(mean_air_time),
+    lower_ci = min(lower_ci),
+    upper_ci = max(upper_ci)
+  )
+
+# Print or view the summary table
+print(summary_table)
+```
